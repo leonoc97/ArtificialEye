@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import cv2
 import math
 
-#TESSSSSSSSSSSSSSSSST
+#TESSSSSSSSSfrSSSSSSSST
 
 
 # Start webcam or specify video file path
