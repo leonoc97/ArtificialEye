@@ -4,6 +4,8 @@ import math
 
 #TESSSSSSSSSfrSSSSSSSST
 
+#ADFA DKAEWDF
+
 
 # Start webcam or specify video file path
 video_path = ('seat1.mp4')
