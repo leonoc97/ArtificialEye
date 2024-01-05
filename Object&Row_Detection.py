@@ -2,8 +2,11 @@ from ultralytics import YOLO
 import cv2
 import math
 
+#TESSSSSSSSSSSSSSSSST
+
+
 # Start webcam or specify video file path
-video_path = ('seat1q.mp4')
+video_path = ('seat1.mp4')
 cap = cv2.VideoCapture(video_path)
 
 # Check if the video file is opened successfully
