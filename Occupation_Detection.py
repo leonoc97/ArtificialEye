@@ -6,6 +6,8 @@ import math
 #cap.set(3, 640)
 #cap.set(4, 480)
 
+# HELLOOOO
+
 video_path = ('seat1.mp4')
 cap = cv2.VideoCapture(video_path)
 # Check if the video file is opened successfully
