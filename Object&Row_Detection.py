@@ -4,7 +4,7 @@ import math
 
 #TESSSSSSSSSfrSSSSSSSST
 
-#ADFA DKAEWDF
+#ADFA
 
 
 # Start webcam or specify video file path
