@@ -2,10 +2,6 @@ from ultralytics import YOLO
 import cv2
 import math
 
-#TESSSSSSSSSfrSSSSSSSST
-
-#ADFA
-
 
 # Start webcam or specify video file path
 video_path = ('seat1.mp4')
