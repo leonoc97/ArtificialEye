@@ -129,30 +129,38 @@ while True:
                         obj['display'] = False  # Do not display the individual backpack
                         break
 
+    # Sort the objects based on the vertical position of their midpoints
+    merged_objects = sorted(merged_objects, key=lambda obj: (obj['bbox'][1] + obj['bbox'][3]) / 2, reverse=True)
+
+    # Assign 'front' or 'back' labels
+    for i, obj in enumerate(merged_objects):
+        if i < 3:  # First three are closest to the bottom
+            obj['position'] = 'front'
+        else:
+            obj['position'] = 'back'
+
     # Draw bounding boxes
     for obj in merged_objects:
         if obj['display']:
             bbox = obj['bbox']
             confidence = obj['confidence']
-            label = f"{obj['class']} - Confidence: {confidence * 100:.2f}%"
+            position_label = obj.get('position', '')
+
+            label = f"{obj['class']} ({position_label}) - Confidence: {confidence * 100:.2f}%"
 
             # Set color based on class
             if obj['class'] == 'person':
                 color = (0, 255, 0)
             elif obj['class'] == 'backpack_on_chair':
-                color = (255, 255, 0)  # Unique color for backpack on chair
+                color = (255, 255, 0)
             else:
                 color = (255, 0, 0)
 
-            # Draw bounding box
+            # Draw bounding box, midpoint, and label
             cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 3)
-
-            # Calculate and draw midpoint
             mid_x = int((bbox[0] + bbox[2]) / 2)
             mid_y = int((bbox[1] + bbox[3]) / 2)
             cv2.circle(img, (mid_x, mid_y), 5, color, -1)
-
-            # Draw confidence rating
             cv2.putText(img, label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
     # Display the frame
