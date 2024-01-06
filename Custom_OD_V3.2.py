@@ -67,6 +67,7 @@ def calculate_overlap(boxA, boxB):
     boxB_area = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
 
     return overlap_area / min(boxA_area, boxB_area)
+screenshot_taken = False
 
 while True:
     success, img = cap.read()
@@ -136,9 +137,9 @@ while True:
     # Assign 'front' or 'back' labels
     for i, obj in enumerate(merged_objects):
         if i < 3:  # First three are closest to the bottom
-            obj['vertical_position'] = 'back'
-        else:
             obj['vertical_position'] = 'front'
+        else:
+            obj['vertical_position'] = 'back'
 
     # Assign 'left', 'center', or 'right' labels
     sorted_by_horizontal = sorted(merged_objects, key=lambda obj: (obj['bbox'][0] + obj['bbox'][2]) / 2)
@@ -175,8 +176,11 @@ while True:
             cv2.circle(img, (mid_x, mid_y), 5, color, -1)
             cv2.putText(img, label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
+
     # Display the frame
     cv2.imshow('Webcam', img)
+
+
     if cv2.waitKey(1) == ord('q'):
         break
 
