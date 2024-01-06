@@ -3,7 +3,7 @@ import cv2
 import math
 
 # Start webcam or specify video file path
-video_path = 'seat1.mp4'
+video_path = 'seat2.mp4'
 cap = cv2.VideoCapture(video_path)
 
 # Check if the video file is opened successfully

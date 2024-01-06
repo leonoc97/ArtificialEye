@@ -25,7 +25,7 @@ def is_inside(boxA, boxB):
     return boxA[0] >= boxB[0] and boxA[1] >= boxB[1] and boxA[2] <= boxB[2] and boxA[3] <= boxB[3]
 
 # Start webcam or specify video file path
-video_path = ('seat1.mp4')
+video_path = ('seat2.mp4')
 cap = cv2.VideoCapture(video_path)
 
 # Check if the video file is opened successfully
@@ -119,6 +119,7 @@ while True:
                 merged_objects.append(obj)
         else:
             merged_objects.append(obj)
+    bbox_counter = 0
 
     # Check for backpack inside chair
     for obj in merged_objects:
@@ -127,6 +128,7 @@ while True:
                 if chair['class'] == 'chair':
                     if calculate_overlap(obj['bbox'], chair['bbox']) > 0.8:  # 80% inside threshold
                         chair['class'] = 'backpack_on_chair'
+                        #chair['display'] = False  # Do not display the individual chair
                         obj['display'] = False  # Do not display the individual backpack
                         break
 
@@ -151,31 +153,57 @@ while True:
         else:
             obj['horizontal_position'] = 'center'
 
+    # Initialize counters
+    person_count = 0
+    chair_count = 0
+    backpack_on_chair_count = 0
+
     # Draw bounding boxes
     for obj in merged_objects:
-        if obj.get('display', True):
-            bbox = obj['bbox']
-            confidence = obj['confidence']
-            vertical_label = obj.get('vertical_position', '')
-            horizontal_label = obj.get('horizontal_position', '')
+        # Skip drawing individual backpacks or chairs if a backpack is on a chair
+        if 'display' in obj and not obj['display']:
+            continue
 
-            label = f"{obj['class']} ({vertical_label}, {horizontal_label}) - Confidence: {confidence * 100:.2f}%"
+        bbox = obj['bbox']
+        confidence = obj['confidence']
+        label = f"{obj['class']} - Confidence: {confidence * 100:.2f}%"
 
-            # Set color based on class
-            if obj['class'] == 'person':
-                color = (0, 255, 0)
-            elif obj['class'] == 'backpack_on_chair':
-                color = (255, 255, 0)
-            else:
-                color = (255, 0, 0)
+        if obj['class'] == 'person':
+            color = (0, 255, 0)
+            person_count += 1
+        elif obj['class'] == 'backpack_on_chair':
+            color = (255, 255, 0)
+            backpack_on_chair_count += 1
+        elif obj['class'] == 'chair':
+            color = (255, 0, 0)
+            chair_count += 1
+        else:
+            color = (255, 0, 0)  # Default color for other classes
 
-            # Draw bounding box, midpoint, and label
-            cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 3)
-            mid_x = int((bbox[0] + bbox[2]) / 2)
-            mid_y = int((bbox[1] + bbox[3]) / 2)
-            cv2.circle(img, (mid_x, mid_y), 5, color, -1)
-            cv2.putText(img, label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        # Draw bounding box
+        cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 3)
 
+        # Calculate and draw midpoint
+        mid_x = int((bbox[0] + bbox[2]) / 2)
+        mid_y = int((bbox[1] + bbox[3]) / 2)
+        cv2.circle(img, (mid_x, mid_y), 5, color, -1)
+
+        # Draw confidence rating
+        cv2.putText(img, label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # Increment the bounding box counter
+        bbox_counter += 1
+
+    # Display the number of bounding boxes on the top right of the screen
+    text_position = (img.shape[1] - 200, 30)  # Adjust (x, y) values as needed
+    cv2.putText(img, f"Bounding Boxes: {bbox_counter}", text_position,
+                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    print(f"Persons: {person_count}, Chairs: {chair_count}, Backpacks on Chairs: {backpack_on_chair_count}")
+
+    total = person_count + chair_count + backpack_on_chair_count
+
+    #if total == 6:
+     #   break
 
     # Display the frame
     cv2.imshow('Webcam', img)
