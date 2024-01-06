@@ -94,9 +94,8 @@ while True:
 
                 # Confidence
                 confidence = math.ceil((box.conf[0] * 100)) / 100
-                print(f"{class_name} - Confidence: {confidence}")
 
-                detected_objects.append({"class": class_name, "bbox": (x1, y1, x2, y2), "confidence": confidence})
+                detected_objects.append({"class": class_name, "bbox": (x1, y1, x2, y2), "confidence": confidence, "display": True})
 
     # Merge overlapping chairs and check backpack inside chair
     merged_objects = []
@@ -127,32 +126,54 @@ while True:
                 if chair['class'] == 'chair':
                     if calculate_overlap(obj['bbox'], chair['bbox']) > 0.8:  # 80% inside threshold
                         chair['class'] = 'backpack_on_chair'
+                        obj['display'] = False  # Do not display the individual backpack
                         break
+
+    # Sort the objects based on the vertical position of their midpoints
+    merged_objects = sorted(merged_objects, key=lambda obj: (obj['bbox'][1] + obj['bbox'][3]) / 2, reverse=True)
+    merged_objects = sorted(merged_objects, key=lambda obj: ((obj['bbox'][1] + obj['bbox'][3]) / 2, (obj['bbox'][0] + obj['bbox'][2]) / 2))
+
+    # Assign 'front' or 'back' labels
+    for i, obj in enumerate(merged_objects):
+        if i < 3:  # First three are closest to the bottom
+            obj['vertical_position'] = 'back'
+        else:
+            obj['vertical_position'] = 'front'
+
+    # Assign 'left', 'center', or 'right' labels
+    sorted_by_horizontal = sorted(merged_objects, key=lambda obj: (obj['bbox'][0] + obj['bbox'][2]) / 2)
+    for i, obj in enumerate(sorted_by_horizontal):
+        if i < 2:  # First two are closest to the left
+            obj['horizontal_position'] = 'left'
+        elif i >= len(sorted_by_horizontal) - 2:  # Last two are closest to the right
+            obj['horizontal_position'] = 'right'
+        else:
+            obj['horizontal_position'] = 'center'
 
     # Draw bounding boxes
     for obj in merged_objects:
-        bbox = obj['bbox']
-        confidence = obj['confidence']
-        label = f"{obj['class']} - Confidence: {confidence * 100:.2f}%"
+        if obj.get('display', True):
+            bbox = obj['bbox']
+            confidence = obj['confidence']
+            vertical_label = obj.get('vertical_position', '')
+            horizontal_label = obj.get('horizontal_position', '')
 
-        # Set color based on class
-        if obj['class'] == 'person':
-            color = (0, 255, 0)
-        elif obj['class'] == 'backpack_on_chair':
-            color = (255, 255, 0)  # Unique color for backpack on chair
-        else:
-            color = (255, 0, 0)
+            label = f"{obj['class']} ({vertical_label}, {horizontal_label}) - Confidence: {confidence * 100:.2f}%"
 
-        # Draw bounding box
-        cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 3)
+            # Set color based on class
+            if obj['class'] == 'person':
+                color = (0, 255, 0)
+            elif obj['class'] == 'backpack_on_chair':
+                color = (255, 255, 0)
+            else:
+                color = (255, 0, 0)
 
-        # Calculate and draw midpoint
-        mid_x = int((bbox[0] + bbox[2]) / 2)
-        mid_y = int((bbox[1] + bbox[3]) / 2)
-        cv2.circle(img, (mid_x, mid_y), 5, color, -1)
-
-        # Draw confidence rating
-        cv2.putText(img, label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            # Draw bounding box, midpoint, and label
+            cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 3)
+            mid_x = int((bbox[0] + bbox[2]) / 2)
+            mid_y = int((bbox[1] + bbox[3]) / 2)
+            cv2.circle(img, (mid_x, mid_y), 5, color, -1)
+            cv2.putText(img, label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
     # Display the frame
     cv2.imshow('Webcam', img)
