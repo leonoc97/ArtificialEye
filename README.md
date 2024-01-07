@@ -7,3 +7,4 @@ Within the masters course Active Assisted Living and in hinsight to the cybathlo
 
 https://github.com/leonoc97/ArtificialEye/assets/130671806/65892441-dba0-44f9-a29e-a6e8cfec15b6
 
+![image](https://github.com/leonoc97/ArtificialEye/assets/130671806/99a58d5a-1aa5-43d6-a0ed-27f1e548371c)
