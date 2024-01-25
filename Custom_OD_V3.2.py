@@ -2,6 +2,32 @@ from ultralytics import YOLO
 import cv2
 import math
 
+
+def calculate_overlap(boxA, boxB):
+    # Calculate the overlapping area between two boxes
+    x_left = max(boxA[0], boxB[0])
+    y_top = max(boxA[1], boxB[1])
+    x_right = min(boxA[2], boxB[2])
+    y_bottom = min(boxA[3], boxB[3])
+
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+
+    overlap_area = (x_right - x_left) * (y_bottom - y_top)
+    boxA_area = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
+    boxB_area = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
+
+    return overlap_area / min(boxA_area, boxB_area)
+
+
+screenshot_taken = False
+def merge_boxes(boxA, boxB):
+    return (
+        min(boxA[0], boxB[0]),  # x1
+        min(boxA[1], boxB[1]),  # y1
+        max(boxA[2], boxB[2]),  # x2
+        max(boxA[3], boxB[3])   # y2
+    )
 def calculate_iou(boxA, boxB):
     # Determine the coordinates of the intersection rectangle
     xA = max(boxA[0], boxB[0])
@@ -20,19 +46,20 @@ def calculate_iou(boxA, boxB):
     iou = interArea / float(boxAArea + boxBArea - interArea)
     return iou
 
+
 def is_inside(boxA, boxB):
     # Check if boxA is inside boxB
     return boxA[0] >= boxB[0] and boxA[1] >= boxB[1] and boxA[2] <= boxB[2] and boxA[3] <= boxB[3]
 
+
 # Start webcam or specify video file path
-video_path = ('seat1.mp4')
+video_path = ('seat_1.mp4')
 cap = cv2.VideoCapture(video_path)
 
 # Check if the video file is opened successfully
 if not cap.isOpened():
     print("Error: Couldn't open video file.")
     exit()
-
 
 # model
 model = YOLO("yolo-Weights/yolov8n.pt")
@@ -50,24 +77,13 @@ classNames = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "trai
               "teddy bear", "hair drier", "toothbrush"
               ]
 
-desired_classes = ["person", "chair", "backpack"]
+desired_classes = ["person", "chair", "backpack", "handbag"]
 
-def calculate_overlap(boxA, boxB):
-    # Calculate the overlapping area between two boxes
-    x_left = max(boxA[0], boxB[0])
-    y_top = max(boxA[1], boxB[1])
-    x_right = min(boxA[2], boxB[2])
-    y_bottom = min(boxA[3], boxB[3])
+# Define overlap thresholds
+chair_overlap_threshold = 0.5  # 50% overlap threshold for chairs
+person_overlap_threshold = 0.85  # 85% overlap threshold for persons
+bag_on_chair_overlap_threshold = 0.6  # 60% overlap threshold for bag on chair
 
-    if x_right < x_left or y_bottom < y_top:
-        return 0.0
-
-    overlap_area = (x_right - x_left) * (y_bottom - y_top)
-    boxA_area = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
-    boxB_area = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
-
-    return overlap_area / min(boxA_area, boxB_area)
-screenshot_taken = False
 
 while True:
     success, img = cap.read()
@@ -96,45 +112,48 @@ while True:
                 # Confidence
                 confidence = math.ceil((box.conf[0] * 100)) / 100
 
-                detected_objects.append({"class": class_name, "bbox": (x1, y1, x2, y2), "confidence": confidence, "display": True})
+                detected_objects.append(
+                    {"class": class_name, "bbox": (x1, y1, x2, y2), "confidence": confidence, "display": True})
 
-    # Merge overlapping chairs and check backpack inside chair
+   # Merge overlapping chairs and check backpack inside chair
+    # Merge overlapping objects with class-specific thresholds
+    # Merge overlapping objects with different thresholds for chairs and persons
     merged_objects = []
     for obj in detected_objects:
-        if obj['class'] == 'chair':
-            # Check for overlapping chairs
-            is_merged = False
-            for merged_obj in merged_objects:
-                if merged_obj['class'] == 'chair':
-                    if calculate_overlap(obj['bbox'], merged_obj['bbox']) > 0.8:  # 80% overlap threshold
-                        # Merge the bounding boxes
-                        merged_x1 = min(obj['bbox'][0], merged_obj['bbox'][0])
-                        merged_y1 = min(obj['bbox'][1], merged_obj['bbox'][1])
-                        merged_x2 = max(obj['bbox'][2], merged_obj['bbox'][2])
-                        merged_y2 = max(obj['bbox'][3], merged_obj['bbox'][3])
-                        merged_obj['bbox'] = (merged_x1, merged_y1, merged_x2, merged_y2)
-                        is_merged = True
-                        break
-            if not is_merged:
-                merged_objects.append(obj)
-        else:
-            merged_objects.append(obj)
-    bbox_counter = 0
+        is_merged = False
+        for merged_obj in merged_objects:
+            overlap = calculate_overlap(obj['bbox'], merged_obj['bbox'])
 
-    # Check for backpack inside chair
+            if obj['class'] == 'chair' and merged_obj['class'] == 'chair' and overlap > chair_overlap_threshold:
+                # Merge chairs
+                merged_bbox = merge_boxes(obj['bbox'], merged_obj['bbox'])
+                merged_obj['bbox'] = merged_bbox
+                is_merged = True
+                break
+            elif obj['class'] == 'person' and merged_obj['class'] == 'person' and overlap > person_overlap_threshold:
+                # Merge persons
+                merged_bbox = merge_boxes(obj['bbox'], merged_obj['bbox'])
+                merged_obj['bbox'] = merged_bbox
+                is_merged = True
+                break
+
+        if not is_merged:
+            merged_objects.append(obj)
+
+    # Check for backpack or handbag inside chair
     for obj in merged_objects:
-        if obj['class'] == 'backpack':
+        if obj['class'] in ['backpack', 'handbag']:
             for chair in merged_objects:
                 if chair['class'] == 'chair':
-                    if calculate_overlap(obj['bbox'], chair['bbox']) > 0.8:  # 80% inside threshold
-                        chair['class'] = 'backpack_on_chair'
-                        #chair['display'] = False  # Do not display the individual chair
-                        obj['display'] = False  # Do not display the individual backpack
+                    if calculate_overlap(obj['bbox'], chair['bbox']) > bag_on_chair_overlap_threshold:
+                        chair['class'] = 'bag_on_chair'
+                        obj['display'] = False  # Do not display the individual backpack or handbag
                         break
 
     # Sort the objects based on the vertical position of their midpoints
     merged_objects = sorted(merged_objects, key=lambda obj: (obj['bbox'][1] + obj['bbox'][3]) / 2, reverse=True)
-    merged_objects = sorted(merged_objects, key=lambda obj: ((obj['bbox'][1] + obj['bbox'][3]) / 2, (obj['bbox'][0] + obj['bbox'][2]) / 2))
+    merged_objects = sorted(merged_objects, key=lambda obj: (
+        (obj['bbox'][1] + obj['bbox'][3]) / 2, (obj['bbox'][0] + obj['bbox'][2]) / 2))
 
     # Assign 'front' or 'back' labels
     for i, obj in enumerate(merged_objects):
@@ -156,19 +175,19 @@ while True:
     # Initialize counters
     person_count = 0
     chair_count = 0
-    backpack_on_chair_count = 0
+    bag_on_chair_count = 0
 
     # Draw bounding boxes
     # Draw bounding boxes
     for obj in merged_objects:
-        # Skip drawing individual backpacks or chairs if a backpack is on a chair
+        # Skip drawing individual backpacks, handbags, or chairs if a bag is on a chair
         if 'display' in obj and not obj['display']:
             continue
 
         bbox = obj['bbox']
         confidence = obj['confidence']
 
-        # Determine the full position label (e.g., "Front Right")
+        # Determine the full position label
         position_label = f"{obj.get('vertical_position', '')} {obj.get('horizontal_position', '')}".strip()
         full_label = f"{obj['class']} ({position_label}) - {confidence * 100:.2f}%"
 
@@ -176,16 +195,16 @@ while True:
         if obj['class'] == 'person':
             color = (0, 255, 0)
             person_count += 1
-        elif obj['class'] == 'backpack_on_chair':
+        elif obj['class'] == 'bag_on_chair':  # Updated label
             color = (255, 255, 0)
-            backpack_on_chair_count += 1
+            bag_on_chair_count += 1
         elif obj['class'] == 'chair':
             color = (255, 0, 0)
             chair_count += 1
         else:
             color = (255, 0, 0)  # Default color for other classes
 
-        # Draw bounding box
+        # Draw bounding box, midpoint, and label
         cv2.rectangle(img, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 3)
 
         # Calculate and draw midpoint
@@ -196,9 +215,9 @@ while True:
         # Draw the full label
         cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-    #print(f"Persons: {person_count}, Chairs: {chair_count}, Backpacks on Chairs: {backpack_on_chair_count}")
+    # print(f"Persons: {person_count}, Chairs: {chair_count}, Backpacks on Chairs: {backpack_on_chair_count}")
 
-    total = person_count + chair_count + backpack_on_chair_count
+    total = person_count + chair_count + bag_on_chair_count
 
     if total == 6:
         position_objects = {'Front': {'Right': None, 'Center': None, 'Left': None},
@@ -215,14 +234,18 @@ while True:
                 if position_objects[position_key][horizontal_position] is None:
                     position_objects[position_key][horizontal_position] = obj['class']
 
-        # Reverse the order to print Back first
-        for position in ['Back', 'Front']:
-            objects = position_objects[position]
-            formatted_objects = ['[{}]'.format(objects[pos] if objects[pos] is not None else '') for pos in
-                                 ['Right', 'Center', 'Left']]
-            print(f"{position}: {''.join(formatted_objects)}")
+        # Check if all positions in both rows are filled
+        all_positions_filled = all(
+            position_objects[row][position] is not None for row in position_objects for position in
+            position_objects[row])
 
-        print("End of position details.")
+        if all_positions_filled:
+            for position in ['Back', 'Front']:
+                objects = position_objects[position]
+                formatted_objects = ['[{}]'.format(objects[pos]) for pos in ['Right', 'Center', 'Left']]
+                print(f"{position}: {' '.join(formatted_objects)}")
+        else:
+            print("No")
     cv2.imshow('Webcam', img)
 
     if cv2.waitKey(1) == ord('q'):
