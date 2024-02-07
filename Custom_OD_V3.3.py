@@ -18,8 +18,6 @@ def calculate_overlap(boxA, boxB):
     boxB_area = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
 
     return overlap_area / min(boxA_area, boxB_area)
-
-
 screenshot_taken = False
 def merge_boxes(boxA, boxB):
     return (
@@ -45,15 +43,13 @@ def calculate_iou(boxA, boxB):
     # Compute the intersection over union
     iou = interArea / float(boxAArea + boxBArea - interArea)
     return iou
-
-
 def is_inside(boxA, boxB):
     # Check if boxA is inside boxB
     return boxA[0] >= boxB[0] and boxA[1] >= boxB[1] and boxA[2] <= boxB[2] and boxA[3] <= boxB[3]
 
 
 # Start webcam or specify video file path
-video_path = ('seat_2.mp4')
+video_path = ('seat_4v.mp4')
 cap = cv2.VideoCapture(video_path)
 
 # Check if the video file is opened successfully
@@ -90,6 +86,7 @@ chair_confidence_threshold = 0.1  # 10%
 
 # Outside your main loop
 last_configurations = []
+config_log = {}  # Define config_log dictionary here
 
 while True:
     success, img = cap.read()
@@ -232,6 +229,12 @@ while True:
 
         # Draw the full label
         cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # Print overlap percentage next to the bounding box
+        overlap_text = f"Overlap: {overlap * 100:.2f}%"
+        cv2.putText(img, overlap_text, (bbox[0], bbox[1] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
 
     # print(f"Persons: {person_count}, Chairs: {chair_count}, Backpacks on Chairs: {backpack_on_chair_count}")
 
@@ -239,45 +242,42 @@ while True:
     displayed_bbox_count = sum(1 for obj in merged_objects if obj.get('display', True))
 
     # Check if exactly 6 bounding boxes are displayed
-    # Count the number of displayed bounding boxes
-    displayed_bbox_count = sum(1 for obj in merged_objects if obj.get('display', True))
-
     # Check if exactly 6 bounding boxes are displayed
     if displayed_bbox_count == 6:
-        position_objects = {'Front': {'Right': None, 'Center': None, 'Left': None},
-                            'Back': {'Right': None, 'Center': None, 'Left': None}}
+        position_objects = {'Back': {'Left': 0, 'Center': 0, 'Right': 0},
+                            'Front': {'Left': 0, 'Center': 0, 'Right': 0}}
 
         for obj in merged_objects:
-            if obj['class'] in desired_classes and obj.get('display', True):
+            if obj['class'] == 'chair' and obj.get('display', True):
                 position_key = obj['vertical_position'].capitalize()
-                horizontal_position = 'Left' if obj['horizontal_position'].capitalize() == 'Right' else 'Right' if obj[
-                                                                                                                       'horizontal_position'].capitalize() == 'Left' else 'Center'
+                horizontal_position = obj['horizontal_position'].capitalize()
+                position_objects[position_key][horizontal_position] = 1
 
-                # Place object in the first available position if not already taken
-                if position_objects[position_key][horizontal_position] is None:
-                    position_objects[position_key][horizontal_position] = obj['class']
+        # Print the binary representation of chair presence
+        chair_presence = [position_objects[row][pos] for row in ['Back', 'Front'] for pos in
+                          ['Left', 'Center', 'Right']]
+        print(chair_presence)
+
+        # Log the configuration
+        config_str = str(chair_presence)
+        if config_str in config_log:
+            config_log[config_str] += 1
+        else:
+            config_log[config_str] = 1
 
         all_positions_filled = all(
             position is not None for row in position_objects.values() for position in row.values())
 
         if all_positions_filled:
-            current_configuration = [''.join(position_objects[row][pos] for pos in ['Right', 'Center', 'Left']) for row
-                                     in ['Back', 'Front']]
+            current_configuration = [position_objects[row][pos] for row in ['Back', 'Front'] for pos in
+                                     ['Right', 'Center', 'Left']]
 
             # Add the current configuration to the list and keep only the last 3
             last_configurations.append(current_configuration)
             last_configurations = last_configurations[-3:]
 
-            # Check if the last 3 configurations are the same
-            if len(last_configurations) == 3 and all(
-                    config == last_configurations[0] for config in last_configurations):
-                # Print the formatted output
-                for position in ['Back', 'Front']:
-                    objects = position_objects[position]
-                    formatted_objects = ['[{}]'.format(objects[pos]) for pos in ['Right', 'Center', 'Left']]
-                    print(f"{position}: {''.join(formatted_objects)}")
 
-                print("End of position details.")
+    # Display the webcam frame
     cv2.imshow('Webcam', img)
 
     if cv2.waitKey(1) == ord('q'):
@@ -285,3 +285,15 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+# After the video processing loop is finished
+
+# Sort the config_log dictionary items based on frequency in descending order
+sorted_configurations = sorted(config_log.items(), key=lambda x: x[1], reverse=True)
+
+# Retrieve the configurations with the highest frequency
+top_configurations = sorted_configurations[:2]
+
+# Print the configurations with their frequencies
+print("Top Configurations:")
+for config, frequency in top_configurations:
+    print(f"Configuration: {config}, Frequency: {frequency}")
