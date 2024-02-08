@@ -5,6 +5,24 @@ from mqtt_publish import publish_top_configuration
 import paho.mqtt.client as mqtt
 import time
 
+# Replace with your MQTT broker's information
+broker_address = "broker.hivemq.com"
+broker_port = 1883
+topic = "emptySeats/AppToHardware"
+start = 0
+
+# Functions for MQTT Communication: on_connect & on_message
+def on_connect(client, userdata, flags, rc):
+    print(f"Connected to MQTT Broker {rc}")
+    # Subscribe to the topic when connected
+    client.subscribe(topic)
+# Function to handle MQTT message reception
+def on_message(client, userdata, message):
+
+    if message.payload.decode() == "start":
+        print(f"Received message: {message.payload.decode()}")
+        print("Object Detection started by the App via MQTT")
+        start_webcam(last_configurations)
 def calculate_overlap(boxA, boxB):
     # Calculate the overlapping area between two boxes
     x_left = max(boxA[0], boxB[0])
@@ -28,10 +46,30 @@ def merge_boxes(boxA, boxB):
         max(boxA[2], boxB[2]),  # x2
         max(boxA[3], boxB[3])   # y2
     )
+def calculate_iou(boxA, boxB):
+    # Determine the coordinates of the intersection rectangle
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2])
+    yB = min(boxA[3], boxB[3])
+
+    # Compute the area of intersection
+    interArea = max(0, xB - xA) * max(0, yB - yA)
+
+    # Compute the area of both bounding boxes
+    boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
+    boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
+
+    # Compute the intersection over union
+    iou = interArea / float(boxAArea + boxBArea - interArea)
+    return iou
+def is_inside(boxA, boxB):
+    # Check if boxA is inside boxB
+    return boxA[0] >= boxB[0] and boxA[1] >= boxB[1] and boxA[2] <= boxB[2] and boxA[3] <= boxB[3]
 
 
 # Start webcam or specify video file path
-video_path = ('seat_4p_1b_2q.mp4')
+video_path = ('seat_2v.mp4')
 cap = cv2.VideoCapture(video_path)
 
 # Check if the video file is opened successfully
@@ -62,6 +100,7 @@ chair_overlap_threshold = 0.5  # 50% overlap threshold for chairs
 person_overlap_threshold = 0.85  # 85% overlap threshold for persons
 bag_overlap_threshold = 0.3
 bag_on_chair_overlap_threshold = 0.3  # 60% overlap threshold for bag on chair
+
 chair_confidence_threshold = 0.1  # 10%
 
 
@@ -69,7 +108,9 @@ chair_confidence_threshold = 0.1  # 10%
 last_configurations = []
 config_log = {}  # Define config_log dictionary here
 
-while True:
+def start_webcam(last_configurations):
+
+    while True:
         success, img = cap.read()
         if not success:
             break
@@ -99,7 +140,9 @@ while True:
                     detected_objects.append(
                         {"class": class_name, "bbox": (x1, y1, x2, y2), "confidence": confidence, "display": True})
 
+       # Merge overlapping chairs and check backpack inside chair
         # Merge overlapping objects with class-specific thresholds
+        # Merge overlapping objects with different thresholds for chairs and persons
         merged_objects = []
 
         for obj in detected_objects:
@@ -117,14 +160,12 @@ while True:
                     merged_obj['bbox'] = merged_bbox
                     is_merged = True
                     break
-
                 elif obj['class'] == 'person' and merged_obj['class'] == 'person' and overlap > person_overlap_threshold:
                     # Merge persons
                     merged_bbox = merge_boxes(obj['bbox'], merged_obj['bbox'])
                     merged_obj['bbox'] = merged_bbox
                     is_merged = True
                     break
-
                 elif (obj['class'] in ['backpack', 'bag'] and merged_obj['class'] in ['backpack', 'bag'] and
                       overlap > bag_overlap_threshold):
                     # Merge bags and backpacks
@@ -266,19 +307,21 @@ while True:
             print("Seat Detection requested by MQTT")
             break
 
-cap.release()
-cv2.destroyAllWindows()
+    cap.release()
+    cv2.destroyAllWindows()
 
-#publish_top_configuration(config_log)
+    publish_top_configuration(config_log)
 
-max_frequency = 0
-top_config = None
-for config, frequency in config_log.items():
-     if frequency > max_frequency:
-        max_frequency = frequency
-        top_config = config
 
-print("The following Configurations were measured:")
-print(config_log)
-print("The following configuration has the highest frequency:")
-print(top_config)
+# Create an MQTT client instance
+client = mqtt.Client()
+
+# Set the callback functions
+client.on_connect = on_connect
+client.on_message = on_message
+
+# Connect to the MQTT broker
+client.connect(broker_address, broker_port, 60)
+
+# Start the loop
+client.loop_forever()
