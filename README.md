@@ -9,8 +9,18 @@ Within the masters course Active Assisted Living and in hinsight to the cybathlo
 ### First Object Detection Algorithm (V1.0)
 https://github.com/leonoc97/ArtificialEye/assets/130671806/65892441-dba0-44f9-a29e-a6e8cfec15b6
 
-## Object Detection 
-### Object Detection Algorithm (V2.0):
-### Accurate Detection, Printout Format for IoT-Application
+# Object Detection 
+## Object Detection Algorithm (V2.0):
+### Improved Detection, Printout Format for IoT-Application
+![image](https://github.com/leonoc97/ArtificialEye/assets/130671806/99a58d5a-1aa5-43d6-a0ed-27f1e548371c)
+
+
+## Object Detection Algorithm (V3.X):
+### More Accurate Detection by implementing box-overlap functions with subjective tresholds
+### Decision Mechanism with an accuracy of over 90 % 
+![image](https://github.com/leonoc97/ArtificialEye/assets/130671806/99a58d5a-1aa5-43d6-a0ed-27f1e548371c)
+
+## Object Detection Algorithm (V4.0):
+### MQTT Communication implemented. The App can now be launched at stopped by Voice Commands
 ![image](https://github.com/leonoc97/ArtificialEye/assets/130671806/99a58d5a-1aa5-43d6-a0ed-27f1e548371c)
 
