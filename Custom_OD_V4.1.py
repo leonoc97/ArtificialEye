@@ -323,7 +323,7 @@ def start_webcam(last_configurations):
         displayed_bbox_count = sum(1 for obj in merged_objects if obj.get('display', True))
 
         # Check if exactly 6 bounding boxes are displayed
-        if displayed_bbox_count == 1:
+        if displayed_bbox_count == 6:
 
             if not screenshot_taken:
                 # Save the current frame as a screenshot
