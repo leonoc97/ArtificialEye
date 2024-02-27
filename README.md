@@ -11,14 +11,14 @@ https://github.com/leonoc97/ArtificialEye/assets/130671806/65892441-dba0-44f9-a2
 
 # Object Detection 
 ## Object Detection Algorithm (V2.0):
-### Improved Detection, Printout Format for IoT-Application
-![image](https://github.com/leonoc97/ArtificialEye/assets/130671806/99a58d5a-1aa5-43d6-a0ed-27f1e548371c)
+### More Accurate Detection by implementing box-overlap functions with subjective tresholds
+![Screenshot 2024-02-07 120341](https://github.com/leonoc97/ArtificialEye/assets/130671806/bd101f56-59e1-40de-b270-c6493bb3040c)
 
 
 ## Object Detection Algorithm (V3.X):
-### More Accurate Detection by implementing box-overlap functions with subjective tresholds
-### Decision Mechanism with an accuracy of over 90 % 
-![image](https://github.com/leonoc97/ArtificialEye/assets/130671806/99a58d5a-1aa5-43d6-a0ed-27f1e548371c)
+### Final Decision Mechanism with an accuracy of over 90 % 
+### Improved Detection, Printout Format for IoT-Application
+![Screenshot 2023-12-14 112855](https://github.com/leonoc97/ArtificialEye/assets/130671806/d5d01e1d-b99f-4b88-8cd9-200faeea6868)
 
 ## Object Detection Algorithm (V4.0):
 ### MQTT Communication implemented. The App can now be launched at stopped by Voice Commands
