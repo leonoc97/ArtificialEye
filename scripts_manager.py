@@ -1,8 +1,10 @@
 import sys
+
 print(sys.executable)
 print(sys.version)
 
 from ultralytics import YOLO
+
 import RPi.GPIO as GPIO
 import os
 import cv2
@@ -26,7 +28,6 @@ topic_subscribe = "emptySeats/AppToHardware"
 topic_publish = "emptySeats/HardwareToApp"
 start = 0
 
-
 # YOLO definitions
 
 # object classes
@@ -42,7 +43,7 @@ classNames = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "trai
               "teddy bear", "hair drier", "toothbrush"
               ]
 
-desired_classes = ["person", "chair","backpack", "handbag"]
+desired_classes = ["person", "chair", "backpack", "handbag"]
 
 # Define overlap thresholds
 chair_overlap_threshold = 0.5  # 50% overlap threshold for chairs
@@ -50,15 +51,13 @@ person_overlap_threshold = 0.85  # 85% overlap threshold for persons
 bag_overlap_threshold = 0.3
 bag_on_chair_overlap_threshold = 0.3  # 60% overlap threshold for bag on chair
 
-frame_counter = 0
-
 chair_confidence_threshold = 0.1  # 10%
 
 # Outside your main loop
 last_configurations = []
 config_log = {}  # Define config_log dictionary here
 
-
+frame_counter = 0
 # -----------------------------------------------
 # SETUP
 
@@ -74,8 +73,7 @@ GPIO.output(led_pin_mqtt, GPIO.LOW)
 GPIO.output(led_pin_webcam, GPIO.LOW)
 
 # The first (yellow) LED lights up when the PI is started
-GPIO.output(led_pin_start, GPIO.HIGH)
-
+#GPIO.output(led_pin_start, GPIO.HIGH)
 
 # import YOLO model
 model = YOLO("yolo-Weights/yolov8n.pt")
@@ -92,51 +90,55 @@ if not cap.isOpened():
 
 # -----------------------------------------------
 # FUNCTIONS
-    
+
 # Functions for MQTT Communication: on_connect & on_message
-    
+
 def on_connect(client, userdata, flags, rc):
     print(f"Connected to MQTT Broker with result code {rc}")
 
     # Subscribe to the subcription topic when connected
     client.subscribe(topic_subscribe)
+    client.publish(topic_publish, "piReady")
     client.publish(topic_publish, "PiReady")
+    
+    print("PiReady Sent")
 
     # the second (red) LED lights up when the PI is connected to the MQTT broker
-    GPIO.output(led_pin_mqtt, GPIO.HIGH)
 
-    
+
+
 # Function to handle MQTT message reception
 def on_message(client, userdata, message):
-
     if message.payload.decode() == "start":
         print(f"Received message: {message.payload.decode()}")
         print("Object Detection started by the App via MQTT")
-        
+
         start_webcam(last_configurations)
 
 
 # Function to start the webcam and perform object detection
 # The function is called when the App requests the seat detection
 def start_webcam(last_configurations):
-    
     # Boolean to check if a screenshot has been taken
     # The screenshot is taken when the configuration is detected and is sent to the App
     screenshot_taken = False
+    config_hit_20 = False
+    frame_counter = 0
+    
     
     while True:
         # The third LED lights up when the webcam is started
-        GPIO.output(led_pin_webcam, GPIO.HIGH)
-      
-        frame_counter += 1
-        if frame_counter % 2 != 0:
-            continue
+        #GPIO.output(led_pin_webcam, GPIO.HIGH)
 
-        # Read the frame from the webcam        
+        # Read the frame from the webcam
         success, img = cap.read()
         if not success:
             break
-
+        #Only every second frame is analyzed
+        frame_counter += 1
+        if frame_counter % 2 != 0:
+            continue
+        
         # Perform object detection
         results = model(img, stream=True)
 
@@ -163,7 +165,6 @@ def start_webcam(last_configurations):
                     detected_objects.append(
                         {"class": class_name, "bbox": (x1, y1, x2, y2), "confidence": confidence, "display": True})
 
-
         # Merge overlapping objects with different thresholds for chairs and persons
         merged_objects = []
 
@@ -182,7 +183,8 @@ def start_webcam(last_configurations):
                     merged_obj['bbox'] = merged_bbox
                     is_merged = True
                     break
-                elif obj['class'] == 'person' and merged_obj['class'] == 'person' and overlap > person_overlap_threshold:
+                elif obj['class'] == 'person' and merged_obj[
+                    'class'] == 'person' and overlap > person_overlap_threshold:
                     # Merge persons
                     merged_bbox = merge_boxes(obj['bbox'], merged_obj['bbox'])
                     merged_obj['bbox'] = merged_bbox
@@ -269,11 +271,24 @@ def start_webcam(last_configurations):
             # Calculate and draw midpoint
             mid_x = int((bbox[0] + bbox[2]) / 2)
             mid_y = int((bbox[1] + bbox[3]) / 2)
+            cv2.circle(img, (mid_x, mid_y), 5, color, -1)
+
+            # Draw the full label
+            cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+            # Print overlap percentage next to the bounding box
+            # overlap_text = f"Overlap: {overlap * 100:.2f}%"
+            # cv2.putText(img, overlap_text, (bbox[0], bbox[1] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # print(f"Persons: {person_count}, Chairs: {chair_count}, Backpacks on Chairs: {backpack_on_chair_count}")
+
         # Count the number of displayed bounding boxes
         displayed_bbox_count = sum(1 for obj in merged_objects if obj.get('display', True))
 
         # Check if exactly 6 bounding boxes are displayed
-        if displayed_bbox_count == 2:
+        if displayed_bbox_count == 6:
+
             position_objects = {'Back': {'Left': 1, 'Center': 1, 'Right': 1},
                                 'Front': {'Left': 1, 'Center': 1, 'Right': 1}}
 
@@ -292,6 +307,13 @@ def start_webcam(last_configurations):
             config_str = str(chair_presence)
             if config_str in config_log:
                 config_log[config_str] += 1
+                
+                if config_log[config_str] >= 4:
+                    GPIO.output(led_pin_mqtt, GPIO.HIGH)
+
+                if config_log[config_str] >= 80:
+                    config_hit_20 = True
+
             else:
                 config_log[config_str] = 1
 
@@ -306,15 +328,13 @@ def start_webcam(last_configurations):
                 last_configurations.append(current_configuration)
                 last_configurations = last_configurations[-3:]
 
-
             # Take a screenshot of the current frame and save it in the project's directory
             if screenshot_taken == False:
                 script_dir = os.path.dirname(__file__)
                 screenshot_path = os.path.join(script_dir, "screenshot.jpg")
                 cv2.imwrite(screenshot_path, img)
-                screenshot_taken=True
+                screenshot_taken = True
                 print('screenshot!')
-                
 
         # Display the webcam frame
         cv2.imshow('Webcam', img)
@@ -324,12 +344,21 @@ def start_webcam(last_configurations):
             print("Seat Detection requested by MQTT")
             break
 
+        if config_hit_20:
+            break
+
     cap.release()
     cv2.destroyAllWindows()
 
     # Publish the most frequent configuration and a screenshot of it to MQTT
     publish_top_configuration(config_log)
 
+  # Print summary of all configurations
+    print("Summary of Configurations:")
+    for config_str, config_id in config_log.items():
+        # Convert the configuration string back to a list
+        config_array = eval(config_str)
+        print(f"Configuration {config_id}: {config_array} - Count: {config_log[config_str]}")
 
 def calculate_overlap(boxA, boxB):
     # Calculate the overlapping area between two boxes
@@ -353,7 +382,7 @@ def merge_boxes(boxA, boxB):
         min(boxA[0], boxB[0]),  # x1
         min(boxA[1], boxB[1]),  # y1
         max(boxA[2], boxB[2]),  # x2
-        max(boxA[3], boxB[3])   # y2
+        max(boxA[3], boxB[3])  # y2
     )
 
 
@@ -382,7 +411,7 @@ def is_inside(boxA, boxB):
 
 
 # The main function
-def main ():
+def main():
     # Create an MQTT client instance
     client = mqtt.Client()
 
