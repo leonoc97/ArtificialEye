@@ -50,6 +50,8 @@ person_overlap_threshold = 0.85  # 85% overlap threshold for persons
 bag_overlap_threshold = 0.3
 bag_on_chair_overlap_threshold = 0.3  # 60% overlap threshold for bag on chair
 
+frame_counter = 0
+
 chair_confidence_threshold = 0.1  # 10%
 
 # Outside your main loop
@@ -125,6 +127,10 @@ def start_webcam(last_configurations):
     while True:
         # The third LED lights up when the webcam is started
         GPIO.output(led_pin_webcam, GPIO.HIGH)
+      
+        frame_counter += 1
+        if frame_counter % 2 != 0:
+            continue
 
         # Read the frame from the webcam        
         success, img = cap.read()
@@ -263,29 +269,11 @@ def start_webcam(last_configurations):
             # Calculate and draw midpoint
             mid_x = int((bbox[0] + bbox[2]) / 2)
             mid_y = int((bbox[1] + bbox[3]) / 2)
-            cv2.circle(img, (mid_x, mid_y), 5, color, -1)
-
-            # Draw the full label
-            cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-            cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-            # Print overlap percentage next to the bounding box
-            #overlap_text = f"Overlap: {overlap * 100:.2f}%"
-            #cv2.putText(img, overlap_text, (bbox[0], bbox[1] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-
-        # print(f"Persons: {person_count}, Chairs: {chair_count}, Backpacks on Chairs: {backpack_on_chair_count}")
-
         # Count the number of displayed bounding boxes
         displayed_bbox_count = sum(1 for obj in merged_objects if obj.get('display', True))
 
         # Check if exactly 6 bounding boxes are displayed
         if displayed_bbox_count == 2:
-            
-            
-                                
-            
-            
             position_objects = {'Back': {'Left': 1, 'Center': 1, 'Right': 1},
                                 'Front': {'Left': 1, 'Center': 1, 'Right': 1}}
 
