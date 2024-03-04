@@ -1,16 +1,16 @@
 import paho.mqtt.client as mqtt
 import time
 
-def publish_top_configuration(config_log):
-    # Replace with your information
-    broker_address = "broker.hivemq.com"  # e.g., "192.168.1.10" or "broker.example.com"
-    broker_port = 1883  # Replace with your broker's port
-    topic = "emptySeats/HardwareToApp"  # Replace with your topic
-    username = "leon"  # Replace if your broker requires authentication
-    password = "leon"  # Replace if your broker requires authentication
+# Replace with your information
+broker_address = "broker.hivemq.com"
+broker_port = 1883 
+topic = "emptySeats/HardwareToApp"
+topic_screenshot = "emptySeats/Screenshot" 
 
+def publish_top_configuration(config_log):
+    
     def on_connect(client, userdata, flags, rc):
-        print(f"Connected with result code {rc}")
+        print(f"Publisher Connected with result code {rc}")
 
     def on_publish(client, userdata, mid):
         print(f"Message Published: {mid}")
@@ -38,11 +38,28 @@ def publish_top_configuration(config_log):
             top_config = config
 
     if top_config is not None:
-        # Publish the most frequent configuration
-        client.publish(topic, top_config.replace(' ', ''))
+        
+
+        # Publish a screenshot of the most frequent configuration
+        with open("./screenshot.jpg",'rb') as file:
+            filecontent = file.read()
+            byteArr = bytearray(filecontent)
+            client.publish(topic_screenshot,byteArr,2)
+            print("Screenshot sent to the app")
+
+            # Publish the most frequent configuration
+            client.publish(topic, top_config.replace(' ', ''))
+
+        # msg_status = result[0]
+        # if msg_status == 0:
+        #    print(f"message sent to topic {topic_screenshot}")
+        # else:
+        #    print(f"Failed to send message to topic {topic_screenshot}")
 
         # Wait for a while to ensure the message is sent
-        time.sleep(2)
+        time.sleep(3)
 
     # Stop the loop and disconnect
     client.loop_stop()
+
+    	

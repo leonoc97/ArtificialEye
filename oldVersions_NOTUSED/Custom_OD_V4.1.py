@@ -111,8 +111,8 @@ def is_inside(boxA, boxB):
 
 
 # Start webcam or specify video file path
-#video_path = ('seat2.mp4')
-cap = cv2.VideoCapture(0)
+video_path = ('seat2.mp4')
+cap = cv2.VideoCapture(video_path)
 
 ########
 image = cv2.imread('/home/emptyseats/project/YOLOv090224/IMG_0597.JPG')
