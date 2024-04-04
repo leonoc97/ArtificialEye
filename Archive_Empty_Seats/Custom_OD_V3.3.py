@@ -1,70 +1,12 @@
-import sys
-print(sys.executable)
-print(sys.version)
-############
-import RPi.GPIO as GPIO
-import time
-
-
-led_pin_start = 18
-led_pin_mqtt = 23
-led_pin_webcam = 24
-
-
-GPIO.setmode(GPIO.BCM)
-# GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-GPIO.setup(led_pin_start, GPIO.OUT)
-GPIO.setup(led_pin_mqtt, GPIO.OUT)
-GPIO.setup(led_pin_webcam, GPIO.OUT)
-
-GPIO.output(led_pin_start, GPIO.LOW)
-GPIO.output(led_pin_mqtt, GPIO.LOW)
-GPIO.output(led_pin_webcam, GPIO.LOW)
-##########
-
 from ultralytics import YOLO
 import cv2
 import math
 from mqtt_publish import publish_top_configuration
 import paho.mqtt.client as mqtt
+import time
+from screenshot_util import take_screenshot_with_boxes
 
 
-
-
-# Replace with your MQTT broker's information
-broker_address = "broker.hivemq.com"
-broker_port = 1883
-topic = "emptySeats/AppToHardware"
-start = 0
-
-
-##############
-GPIO.output(led_pin_start, GPIO.HIGH)
-###########
-
-
-
-# Functions for MQTT Communication: on_connect & on_message
-def on_connect(client, userdata, flags, rc):
-    print(f"Connected to MQTT Broker {rc}")
-
-    GPIO.output(led_pin_mqtt, GPIO.HIGH)
-
-    # Subscribe to the topic when connected
-    client.subscribe(topic)
-    
-# Function to handle MQTT message reception
-def on_message(client, userdata, message):
-
-    if message.payload.decode() == "start":
-        print(f"Received message: {message.payload.decode()}")
-        print("Object Detection started by the App via MQTT")
-        
-        start_webcam(last_configurations)
-        
-    
-    
 def calculate_overlap(boxA, boxB):
     # Calculate the overlapping area between two boxes
     x_left = max(boxA[0], boxB[0])
@@ -88,35 +30,11 @@ def merge_boxes(boxA, boxB):
         max(boxA[2], boxB[2]),  # x2
         max(boxA[3], boxB[3])   # y2
     )
-def calculate_iou(boxA, boxB):
-    # Determine the coordinates of the intersection rectangle
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-
-    # Compute the area of intersection
-    interArea = max(0, xB - xA) * max(0, yB - yA)
-
-    # Compute the area of both bounding boxes
-    boxAArea = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
-    boxBArea = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
-
-    # Compute the intersection over union
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-    return iou
-def is_inside(boxA, boxB):
-    # Check if boxA is inside boxB
-    return boxA[0] >= boxB[0] and boxA[1] >= boxB[1] and boxA[2] <= boxB[2] and boxA[3] <= boxB[3]
 
 
 # Start webcam or specify video file path
-#video_path = ('seat2.mp4')
-cap = cv2.VideoCapture(0)
-
-########
-image = cv2.imread('/home/emptyseats/project/YOLOv090224/IMG_0597.JPG')
-########
+video_path = ('seat_3v.mp4')
+cap = cv2.VideoCapture(video_path)
 
 # Check if the video file is opened successfully
 if not cap.isOpened():
@@ -146,32 +64,20 @@ chair_overlap_threshold = 0.5  # 50% overlap threshold for chairs
 person_overlap_threshold = 0.85  # 85% overlap threshold for persons
 bag_overlap_threshold = 0.3
 bag_on_chair_overlap_threshold = 0.3  # 60% overlap threshold for bag on chair
-
 chair_confidence_threshold = 0.1  # 10%
+
+# Initialize configuration ID counter outside the loop
+config_id_counter = 1
+
+# Initialize a set to store encountered configurations
+encountered_configurations = set()
 
 
 # Outside your main loop
 last_configurations = []
 config_log = {}  # Define config_log dictionary here
-# Initialize flag to track if screenshot has been taken
-screenshot_taken = False
 
-def start_webcam(last_configurations):
-    
-    ### for debugging
-    print('Webcam started')
-    ###
-
-    while True:
-        
-        GPIO.output(led_pin_webcam, GPIO.HIGH)
-        #cv2.imshow('Bild', image)
-        #cv2.waitKey(0)
-        
-        ### debbugging
-        #break
-        ###
-        
+while True:
         success, img = cap.read()
         if not success:
             break
@@ -201,9 +107,7 @@ def start_webcam(last_configurations):
                     detected_objects.append(
                         {"class": class_name, "bbox": (x1, y1, x2, y2), "confidence": confidence, "display": True})
 
-       # Merge overlapping chairs and check backpack inside chair
         # Merge overlapping objects with class-specific thresholds
-        # Merge overlapping objects with different thresholds for chairs and persons
         merged_objects = []
 
         for obj in detected_objects:
@@ -221,12 +125,14 @@ def start_webcam(last_configurations):
                     merged_obj['bbox'] = merged_bbox
                     is_merged = True
                     break
+
                 elif obj['class'] == 'person' and merged_obj['class'] == 'person' and overlap > person_overlap_threshold:
                     # Merge persons
                     merged_bbox = merge_boxes(obj['bbox'], merged_obj['bbox'])
                     merged_obj['bbox'] = merged_bbox
                     is_merged = True
                     break
+
                 elif (obj['class'] in ['backpack', 'bag'] and merged_obj['class'] in ['backpack', 'bag'] and
                       overlap > bag_overlap_threshold):
                     # Merge bags and backpacks
@@ -314,7 +220,9 @@ def start_webcam(last_configurations):
             cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
             cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-
+            # Print overlap percentage next to the bounding box
+            overlap_text = f"Overlap: {overlap * 100:.2f}%"
+            cv2.putText(img, overlap_text, (bbox[0], bbox[1] - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
 
         # print(f"Persons: {person_count}, Chairs: {chair_count}, Backpacks on Chairs: {backpack_on_chair_count}")
@@ -322,14 +230,10 @@ def start_webcam(last_configurations):
         # Count the number of displayed bounding boxes
         displayed_bbox_count = sum(1 for obj in merged_objects if obj.get('display', True))
 
+
+
         # Check if exactly 6 bounding boxes are displayed
         if displayed_bbox_count == 6:
-
-            if not screenshot_taken:
-                # Save the current frame as a screenshot
-                cv2.imwrite("screenshot.jpg", img)
-                screenshot_taken = True  # Update the flag to avoid taking more screenshots
-
             position_objects = {'Back': {'Left': 1, 'Center': 1, 'Right': 1},
                                 'Front': {'Left': 1, 'Center': 1, 'Right': 1}}
 
@@ -354,6 +258,8 @@ def start_webcam(last_configurations):
             all_positions_filled = all(
                 position is not None for row in position_objects.values() for position in row.values())
 
+
+            # Inside the loop where new configurations are detected
             if all_positions_filled:
                 current_configuration = [position_objects[row][pos] for row in ['Back', 'Front'] for pos in
                                          ['Right', 'Center', 'Left']]
@@ -362,6 +268,23 @@ def start_webcam(last_configurations):
                 last_configurations.append(current_configuration)
                 last_configurations = last_configurations[-3:]
 
+                # Convert the configuration to a string representation
+                config_str = str(current_configuration)
+
+                # Check if this configuration is encountered for the first time
+                if config_str not in encountered_configurations:
+                    # Log the configuration with an ID
+                    config_log[config_str] = config_id_counter
+
+                    # Take a screenshot with bounding boxes
+                    ret, frame = cap.read()
+                    take_screenshot_with_boxes(frame, merged_objects, f"config_{config_id_counter}.jpg")
+
+                    # Add the configuration to the set of encountered configurations
+                    encountered_configurations.add(config_str)
+
+                    # Increment configuration ID counter
+                    config_id_counter += 1
 
         # Display the webcam frame
         cv2.imshow('Webcam', img)
@@ -371,21 +294,19 @@ def start_webcam(last_configurations):
             print("Seat Detection requested by MQTT")
             break
 
-    cap.release()
-    cv2.destroyAllWindows()
+cap.release()
+cv2.destroyAllWindows()
 
-    publish_top_configuration(config_log)
+#publish_top_configuration(config_log)
 
+max_frequency = 0
+top_config = None
+for config, frequency in config_log.items():
+     if frequency > max_frequency:
+        max_frequency = frequency
+        top_config = config
 
-# Create an MQTT client instance
-client = mqtt.Client()
-
-# Set the callback functions
-client.on_connect = on_connect
-client.on_message = on_message
-
-# Connect to the MQTT broker
-client.connect(broker_address, broker_port, 60)
-
-# Start the loop
-client.loop_forever()
+print("The following Configurations were measured:")
+print(config_log)
+print("The following configuration has the highest frequency:")
+print(top_config)
