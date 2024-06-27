@@ -1,0 +1,17 @@
+names:
+- apple
+- banana
+- bottle
+- mug
+- phone
+- toothbrush
+nc: 6
+roboflow:
+  license: Private
+  project: object-finder-cexqc
+  url: https://app.roboflow.com/finder-task/object-finder-cexqc/2
+  version: 2
+  workspace: finder-task
+test: ../test/images
+train: Object-Finder-2/train/images
+val: Object-Finder-2/valid/images
