@@ -11,6 +11,6 @@ The preprocessing of the dataset was done completely in Roboflow, including labe
 The finished dataset as well as the Roboflow model and the Custom-trained model (.ipynb) are included in this Repository.
 To prove the correct predictions of the Roboflow model, the model is applied to a testing image containing all items to be detected.
 
-Dataset: Folder "**Annotated images**"
-Roboflow model: Folder "Cybathlon_Roboflow_model" -> File "**Roboflow_model.ipynb**"
-Custom Yolov9 model: File "**Finder_Task_YOLO9_training.ipynb**"
+- Dataset: Folder "**Annotated images**" <br>
+- Roboflow model: Folder "Cybathlon_Roboflow_model" -> File "**Roboflow_model.ipynb**" <br>
+- Custom Yolov9 model: File "**Finder_Task_YOLO9_training.ipynb**"
