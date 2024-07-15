@@ -27,7 +27,7 @@ broker_port = 1883
 topic_subscribe = "emptySeats/AppToHardware"
 topic_publish = "emptySeats/HardwareToApp"
 start = 0
-
+#hi
 # YOLO definitions
 
 # object classes
