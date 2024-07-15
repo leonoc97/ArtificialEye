@@ -17,7 +17,7 @@ from mqtt_publish import publish_top_configuration
 # INITIALIZATION
 
 # pins for the LED indication
-led_pin_start = 183
+led_pin_start = 18
 led_pin_mqtt = 23
 led_pin_webcam = 24
 
