@@ -1,18 +1,19 @@
+DUE:
+pip install pyttsx3
+
+
 import sys
 import os
 import cv2
 import math
 import RPi.GPIO as GPIO
-import pyttsx3
 from ultralytics import YOLO
 
 # ------------------------------------------------
 # INITIALIZATION
 
-# Pins for the button, LED, and buzzer
+# Pin for the button
 button_pin = 17  # Assuming GPIO17 for the button
-led_pin = 27     # Assuming GPIO27 for the LED
-buzzer_pin = 22  # Assuming GPIO22 for the buzzer
 
 # YOLO definitions
 classNames = [
@@ -44,13 +45,6 @@ model = YOLO("yolo-Weights/yolov8n.pt")
 # Setup GPIO
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(button_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(led_pin, GPIO.OUT)
-GPIO.setup(buzzer_pin, GPIO.OUT)
-
-# Setup text-to-speech engine
-engine = pyttsx3.init()
-engine.setProperty('rate', 150)  # Speed of speech
-engine.setProperty('volume', 1.0)  # Volume level (0.0 to 1.0)
 
 # ------------------------------------------------
 # FUNCTIONS
@@ -78,13 +72,6 @@ def merge_boxes(boxA, boxB):
         max(boxA[2], boxB[2]),
         max(boxA[3], boxB[3])
     )
-
-
-def announce_configuration(configuration):
-    config_words = ['free' if seat == 0 else 'occupied' for seat in configuration]
-    config_string = ' '.join(config_words)
-    engine.say(f"The final configuration is {config_string}")
-    engine.runAndWait()
 
 
 def start_object_detection():
@@ -180,25 +167,10 @@ def start_object_detection():
             cv2.circle(img, (mid_x, mid_y), 5, color, -1)
             cv2.putText(img, full_label, (bbox[0], bbox[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-        # Check for specific configurations (example)
-        configuration_detected = any(obj['class'] == 'chair' and obj['confidence'] >= chair_confidence_threshold for obj in merged_objects)
-        if configuration_detected:
-            GPIO.output(led_pin, GPIO.HIGH)
-            GPIO.output(buzzer_pin, GPIO.HIGH)
-            engine.say("Configuration detected")
-            engine.runAndWait()
-        else:
-            GPIO.output(led_pin, GPIO.LOW)
-            GPIO.output(buzzer_pin, GPIO.LOW)
-
         cv2.imshow('Webcam', img)
 
         if cv2.waitKey(1) == ord('q'):
             break
-
-    # Final configuration announcement
-    final_configuration = [1 if any(obj['class'] == 'chair' and obj['confidence'] >= chair_confidence_threshold for obj in merged_objects) else 0 for _ in range(6)]
-    announce_configuration(final_configuration)
 
     cap.release()
     cv2.destroyAllWindows()
